@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Apex Performance Tracker</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+body {
+  font-family: Arial, sans-serif;
+  margin: 0;
+  padding: 10px;
+}
+input, button {
+  font-size: 16px;
+  padding: 6px;
+}
+#teamList div {
+  cursor: pointer;
+  padding: 6px;
+  border-bottom: 1px solid #ccc;
+}
+#overlay {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  background: white;
+  display: none;
+}
+</style>
+</head>
+<body>
+
+<h2>Apex Performance Tracker</h2>
+
+<input id="apexUrl" placeholder="Paste Apex Timing URL" style="width:100%">
+<button onclick="start()">Start</button>
+
+<canvas id="mainChart"></canvas>
+
+<h3>Teams</h3>
+<div id="teamList"></div>
+
+<div id="overlay" onclick="closeOverlay()">
+  <canvas id="teamChart"></canvas>
+</div>
+
+<script>
+const BACKEND_URL = "REPLACE_WITH_BACKEND_URL/data";
+
+let history = {};
+let mainChart;
+
+function start() {
+  setInterval(updateData, 20000);
+  updateData();
+}
+
+async function updateData() {
+  const url = document.getElementById("apexUrl").value;
+  if (!url) return;
+
+  const res = await fetch(BACKEND_URL + "?url=" + encodeURIComponent(url));
+  const data = await res.json();
+  if (!data.teams) return;
+
+  data.teams.forEach(t => {
+    if (!history[t.team]) history[t.team] = [];
+    history[t.team].push(t.lastLap);
+  });
+
+  renderMainChart();
+  renderTeamList();
+}
+
+function renderMainChart() {
+  const ctx = document.getElementById("mainChart").getContext("2d");
+  if (mainChart) mainChart.destroy();
+
+  mainChart = new Chart(ctx, {
+    type: "line",
+    data: {
+      labels: Array.from({length: 100}, (_, i) => i + 1),
+      datasets: Object.keys(history).map(team => ({
+        label: team,
+        data: history[team],
+        fill: false
+      }))
+    }
+  });
+}
+
+function renderTeamList() {
+  const list = document.getElementById("teamList");
+  list.innerHTML = "";
+  Object.keys(history).forEach(team => {
+    const d = document.createElement("div");
+    d.innerText = team;
+    d.onclick = () => openTeam(team);
+    list.appendChild(d);
+  });
+}
+
+function openTeam(team) {
+  document.getElementById("overlay").style.display = "block";
+  const ctx = document.getElementById("teamChart").getContext("2d");
+  new Chart(ctx, {
+    type: "line",
+    data: {
+      labels: history[team].map((_, i) => i + 1),
+      datasets: [{
+        label: team,
+        data: history[team],
+        fill: false
+      }]
+    }
+  });
+}
+
+function closeOverlay() {
+  document.getElementById("overlay").style.display = "none";
+}
+</script>
+
+</body>
+</html>
